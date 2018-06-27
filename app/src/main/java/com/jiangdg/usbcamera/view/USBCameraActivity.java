@@ -27,6 +27,7 @@ import android.widget.Toast;
 import com.jiangdg.usbcamera.R;
 import com.jiangdg.usbcamera.UVCCameraHelper;
 import com.jiangdg.usbcamera.utils.FileUtils;
+import com.jiangdg.webrtc.example.sino.apm_test.MainActivity;
 import com.serenegiant.usb.CameraDialog;
 import com.serenegiant.usb.Size;
 import com.serenegiant.usb.USBMonitor;
@@ -46,7 +47,7 @@ import butterknife.ButterKnife;
  * Created by jiangdongguo on 2017/9/30.
  */
 
-public class USBCameraActivity extends AppCompatActivity implements CameraDialog.CameraDialogParent, CameraViewInterface.Callback {
+public class USBCameraActivity extends AppCompatActivity implements CameraDialog.CameraDialogParent {
     private static final String TAG = "Debug";
     @BindView(R.id.camera_view)
     public View mTextureView;
@@ -65,6 +66,29 @@ public class USBCameraActivity extends AppCompatActivity implements CameraDialog
 
     private boolean isRequest;
     private boolean isPreview;
+    private CameraViewInterface.Callback mCallback = new CameraViewInterface.Callback() {
+        @Override
+        public void onSurfaceCreated(CameraViewInterface view, Surface surface) {
+            if (!isPreview && mCameraHelper.isCameraOpened()) {
+                mCameraHelper.startPreview(mUVCCameraView);
+                isPreview = true;
+            }
+        }
+
+        @Override
+        public void onSurfaceChanged(CameraViewInterface view, Surface surface, int width, int height) {
+            if (isPreview && mCameraHelper.isCameraOpened()) {
+                mCameraHelper.stopPreview();
+                isPreview = false;
+            }
+
+        }
+
+        @Override
+        public void onSurfaceDestroy(CameraViewInterface view, Surface surface) {
+
+        }
+    };
 
     private UVCCameraHelper.OnMyDevConnectListener listener = new UVCCameraHelper.OnMyDevConnectListener() {
 
@@ -112,7 +136,7 @@ public class USBCameraActivity extends AppCompatActivity implements CameraDialog
                             e.printStackTrace();
                         }
                         Looper.prepare();
-                        if(mCameraHelper != null && mCameraHelper.isCameraOpened()) {
+                        if (mCameraHelper != null && mCameraHelper.isCameraOpened()) {
                             mSeekBrightness.setProgress(mCameraHelper.getModelValue(UVCCameraHelper.MODE_BRIGHTNESS));
                             mSeekContrast.setProgress(mCameraHelper.getModelValue(UVCCameraHelper.MODE_CONTRAST));
                         }
@@ -134,32 +158,29 @@ public class USBCameraActivity extends AppCompatActivity implements CameraDialog
         setContentView(R.layout.activity_usbcamera);
         ButterKnife.bind(this);
         initView();
-
         // step.1 initialize UVCCameraHelper
         mUVCCameraView = (CameraViewInterface) mTextureView;
-        mUVCCameraView.setCallback(this);
+        mUVCCameraView.setCallback(mCallback);
         mCameraHelper = UVCCameraHelper.getInstance();
         mCameraHelper.setDefaultFrameFormat(UVCCameraHelper.FRAME_FORMAT_YUYV);
         mCameraHelper.initUSBMonitor(this, mUVCCameraView, listener);
-
-
         mCameraHelper.setOnPreviewFrameListener(new AbstractUVCCameraHandler.OnPreViewResultListener() {
             @Override
             public void onPreviewResult(byte[] nv21Yuv) {
-
+                Log.d(TAG, "onPreviewResult() called with: nv21Yuv = [" + nv21Yuv + "]");
             }
         });
     }
 
     private void initView() {
         setSupportActionBar(mToolbar);
-
+//       初始化对比度和亮度
         mSeekBrightness.setMax(100);
         mSeekBrightness.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                if(mCameraHelper != null && mCameraHelper.isCameraOpened()) {
-                    mCameraHelper.setModelValue(UVCCameraHelper.MODE_BRIGHTNESS,progress);
+                if (mCameraHelper != null && mCameraHelper.isCameraOpened()) {
+                    mCameraHelper.setModelValue(UVCCameraHelper.MODE_BRIGHTNESS, progress);
                 }
             }
 
@@ -177,8 +198,8 @@ public class USBCameraActivity extends AppCompatActivity implements CameraDialog
         mSeekContrast.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                if(mCameraHelper != null && mCameraHelper.isCameraOpened()) {
-                    mCameraHelper.setModelValue(UVCCameraHelper.MODE_CONTRAST,progress);
+                if (mCameraHelper != null && mCameraHelper.isCameraOpened()) {
+                    mCameraHelper.setModelValue(UVCCameraHelper.MODE_CONTRAST, progress);
                 }
             }
 
@@ -221,7 +242,7 @@ public class USBCameraActivity extends AppCompatActivity implements CameraDialog
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
-            case R.id.menu_takepic:
+            case R.id.menu_takepic://拍照
                 if (mCameraHelper == null || !mCameraHelper.isCameraOpened()) {
                     showShortMsg("sorry,camera open failed");
                     return super.onOptionsItemSelected(item);
@@ -231,12 +252,12 @@ public class USBCameraActivity extends AppCompatActivity implements CameraDialog
                 mCameraHelper.capturePicture(picPath, new AbstractUVCCameraHandler.OnCaptureListener() {
                     @Override
                     public void onCaptureResult(String path) {
-                        Log.i(TAG,"save path：" + path);
+                        Log.i(TAG, "save path：" + path);
                     }
                 });
 
                 break;
-            case R.id.menu_recording:
+            case R.id.menu_recording://录制
                 if (mCameraHelper == null || !mCameraHelper.isCameraOpened()) {
                     showShortMsg("sorry,camera open failed");
                     return super.onOptionsItemSelected(item);
@@ -252,19 +273,20 @@ public class USBCameraActivity extends AppCompatActivity implements CameraDialog
                     mCameraHelper.startPusher(params, new AbstractUVCCameraHandler.OnEncodeResultListener() {
                         @Override
                         public void onEncodeResult(byte[] data, int offset, int length, long timestamp, int type) {
+                            Log.d(TAG, "onEncodeResult() called with: data = [" + data + "], offset = [" + offset + "], length = [" + length + "], timestamp = [" + timestamp + "], type = [" + type + "]");
                             // type = 1,h264 video stream
                             if (type == 1) {
                                 FileUtils.putFileStream(data, offset, length);
                             }
                             // type = 0,aac audio stream
-                            if(type == 0) {
+                            if (type == 0) {
 
                             }
                         }
 
                         @Override
                         public void onRecordResult(String videoPath) {
-                            Log.i(TAG,"videoPath = "+videoPath);
+                            Log.i(TAG, "videoPath = " + videoPath);
                         }
                     });
                     // if you only want to push stream,please call like this
@@ -278,24 +300,31 @@ public class USBCameraActivity extends AppCompatActivity implements CameraDialog
                     mSwitchVoice.setEnabled(true);
                 }
                 break;
-            case R.id.menu_resolution:
+            case R.id.menu_resolution://分辨率
                 if (mCameraHelper == null || !mCameraHelper.isCameraOpened()) {
                     showShortMsg("sorry,camera open failed");
                     return super.onOptionsItemSelected(item);
                 }
                 showResolutionListDialog();
                 break;
-            case R.id.menu_focus:
+            case R.id.menu_focus://对焦
                 if (mCameraHelper == null || !mCameraHelper.isCameraOpened()) {
                     showShortMsg("sorry,camera open failed");
                     return super.onOptionsItemSelected(item);
                 }
                 mCameraHelper.startCameraFoucs();
                 break;
+
+            case R.id.menu_nw://声音处理
+                startActivity(new Intent(this, MainActivity.class));
+                break;
         }
         return super.onOptionsItemSelected(item);
     }
 
+    /**
+     * 显示分辨率列表
+     */
     private void showResolutionListDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(USBCameraActivity.this);
         View rootView = LayoutInflater.from(USBCameraActivity.this).inflate(R.layout.layout_dialog_list, null);
@@ -369,25 +398,8 @@ public class USBCameraActivity extends AppCompatActivity implements CameraDialog
     public boolean isCameraOpened() {
         return mCameraHelper.isCameraOpened();
     }
-
-    @Override
-    public void onSurfaceCreated(CameraViewInterface view, Surface surface) {
-        if (!isPreview && mCameraHelper.isCameraOpened()) {
-            mCameraHelper.startPreview(mUVCCameraView);
-            isPreview = true;
-        }
-    }
-
-    @Override
-    public void onSurfaceChanged(CameraViewInterface view, Surface surface, int width, int height) {
-
-    }
-
-    @Override
-    public void onSurfaceDestroy(CameraViewInterface view, Surface surface) {
-        if (isPreview && mCameraHelper.isCameraOpened()) {
-            mCameraHelper.stopPreview();
-            isPreview = false;
-        }
-    }
 }
+
+
+
+

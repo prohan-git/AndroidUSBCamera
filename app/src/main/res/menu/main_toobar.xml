@@ -17,4 +17,9 @@
         android:id="@+id/menu_resolution"
         android:title="resolution(分辨率)"
         app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_nw"
+        android:title="webrtc声音处理"
+        app:showAsAction="never" />
 </menu>

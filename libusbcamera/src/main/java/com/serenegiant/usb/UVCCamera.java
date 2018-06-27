@@ -1235,4 +1235,7 @@ public class UVCCamera {
 	private final native int nativeUpdatePrivacyLimit(final long id_camera);
     private static final native int nativeSetPrivacy(final long id_camera, final boolean privacy);
     private static final native int nativeGetPrivacy(final long id_camera);
+
+
+
 }
